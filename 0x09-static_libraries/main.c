@@ -1,8 +1,10 @@
-#include<stdio.h>
-#include"main.h"
+#include "main.h"
+#include <stdio.h>
 
-int main()
+int main(void)
 {
-printf("The product of a and b is %d, and the division of a and b is %d\n", mul(10, 20), div(30, 2));
-return 0;
+	printf("add(40, 2) = %d\n", add(40, 2));
+	printf("mul(40, 2) = %d\n", mul(40, 2));
+
+	return 0;
 }

@@ -1,75 +1,45 @@
 #include "lists.h"
 
 /**
- * insert_nodeint_at_index - inserts node at index
+ * insert_nodeint_at_index - inserts a new node in a linked list,
+ * at a given position
+ * @head: pointer to the first node in the list
+ * @idx: index where the new node is added
+ * @n: data to insert in the new node
  *
- * @head: head node
- * @idx: index to insert node at
- * @n: value of node
- *
- * Return: address of inserted node or NULL if insertion failed
+ * Return: pointer to the new node, or NULL
  */
 listint_t *insert_nodeint_at_index(listint_t **head, unsigned int idx, int n)
 {
-	unsigned int i = 0;
-	listint_t *current = *head, *new;
+    unsigned int i;
+    listint_t *new;
+    listint_t *temp = *head;
 
-	if (head == NULL && idx == 0) /* list is currently empty, add head node */
-	{
-		new = malloc(sizeof(listint_t));
-		new->n = n;
-		new->next = NULL;
-		(*head) = new;
-		return (new);
-	}
+    new = malloc(sizeof(listint_t));
+    if (!new || !head)
+        return (NULL);
 
-	while (current != NULL)
-	{
-		if (idx == 0) /* insert before head node */
-		{
-			new = malloc(sizeof(listint_t));
-			if (new == NULL)
-			{
-				return (NULL);
-			}
-			new->n = n;
-			new->next = current;
-			(*head) = new;
-			return (new);
-		}
+    new->n = n;
+    new->next = NULL;
 
-		if (i == (idx - 1))
-		{
-			return (insert_before(current, current->next, n));
-		}
-		else
-		{
-			++i;
-			current = current->next;
-		}
-	}
-	return (NULL);
-}
+    if (idx == 0)
+    {
+        new->next = *head;
+        *head = new;
+        return (new);
+    }
 
-/**
- * insert_before - inserts a node before another
- *
- * @before: parent node of current node
- * @current: the node that will be preceded by the new node
- * @value: value of the new node
- *
- * Return: inserted node if successful and NULL if insertion failed
- */
-listint_t *insert_before(listint_t *before, listint_t *current, int value)
-{
-	listint_t *tmp = malloc(sizeof(listint_t));
+    for (i = 0; temp && i < idx; i++)
+    {
+        if (i == idx - 1)
+        {
+            new->next = temp->next;
+            temp->next = new;
+            return (new);
+        }
+        else
+            temp = temp->next;
+    }
 
-	if (tmp == NULL)
-	{
-		return (NULL);
-	}
-	tmp->n = value;
-	tmp->next = current;
-	before->next = tmp;
-	return (tmp);
+    return (NULL);
 }

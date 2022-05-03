@@ -1,176 +1,246 @@
-#include "main.h"
 #include <stdio.h>
-#include <elf.h>
-#include <inttypes.h>
-#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
-#include <stdio.h>
-
-#define ELF32_HEADER_SIZE (sizeof(Elf32_Ehdr))
-#define ELF64_HEADER_SIZE (sizeof(Elf64_Ehdr))
+#include <unistd.h>
+#include <elf.h>
 
 /**
- * ensure_endianness - ensures endianness
- * @little_e: whether data is little endian
- * @data: data to ensure
- * @len: lenth of data
- *
- * Return: void
+ * print_addr - prints address
+ * @ptr: magic.
+ * Return: no return.
  */
-
-void ensure_endianness(char little_e, void *data, unsigned int len)
+void print_addr(char *ptr)
 {
-	unsigned long num = 1, i = 0;
-	char _little_e = ((num >> 8) << 8 != num), tmp, *_data = data;
+	int i;
+	int begin;
+	char sys;
 
-	if (little_e != _little_e)
-		for (i = 0; i < len / 2; i++)
-			tmp = _data[i], _data[i] = _data[len - i - 1], _data[len - i - 1] = tmp;
+	printf("  Entry point address:               0x");
+
+	sys = ptr[4] + '0';
+	if (sys == '1')
+	{
+		begin = 26;
+		printf("80");
+		for (i = begin; i >= 22; i--)
+		{
+			if (ptr[i] > 0)
+				printf("%x", ptr[i]);
+			else if (ptr[i] < 0)
+				printf("%x", 256 + ptr[i]);
+		}
+		if (ptr[7] == 6)
+			printf("00");
+	}
+
+	if (sys == '2')
+	{
+		begin = 26;
+		for (i = begin; i > 23; i--)
+		{
+			if (ptr[i] >= 0)
+				printf("%02x", ptr[i]);
+
+			else if (ptr[i] < 0)
+				printf("%02x", 256 + ptr[i]);
+
+		}
+	}
+	printf("\n");
 }
 
 /**
- * put_err - prints a string to the standard error file
- * @str: string to print
- *
- * Return: void
+ * print_type - prints type
+ * @ptr: magic.
+ * Return: no return.
  */
-
-void put_err(char *str)
+void print_type(char *ptr)
 {
-	int len = 0;
+	char type = ptr[16];
 
-	while (str[len])
-		len++;
-	write(STDERR_FILENO, str, len);
-}
-
-/**
- * print_elf_header - prints the contents of an elf header (first half)
- * @h: elf header
- *
- * Return: void
- */
-
-void print_elf_header(void *h)
-{
-	Elf32_Ehdr *header = h;
-	unsigned char c, i;
-
-	printf("ELF Header:\n");
-	printf("  Magic:  ");
-	for (i = 0; i < EI_NIDENT; i++)
-		printf(" %02x", header->e_ident[(int)i]);
-	printf("\n");
-
-	printf("  Class:                             ");
-	c = header->e_ident[EI_CLASS];
-	printf(c == ELFCLASS32 ? "ELF32"
-			: c == ELFCLASS64 ? "ELF64"
-			: c == ELFCLASSNONE ? "none" : "<unknown: %x>", c);
-	printf("\n");
-
-	printf("  Data:                              ");
-	c = header->e_ident[EI_DATA];
-	printf(c == ELFDATA2LSB ? "2's complement, little endian"
-			: c == ELFDATA2MSB ? "2's complement, big endian"
-			: c == ELFDATANONE ? "none" : "<unknown: %x>", c);
-	printf("\n");
-
-	printf("  Version:                           ");
-	c = header->e_ident[EI_VERSION];
-	printf("%d%s", c, c == EV_CURRENT ? " (current)"
-			: c > EV_CURRENT || c == EV_NONE ? " <unknown>" : "");
-	printf("\n");
-
-	print_elf_header_2(h);
-}
-
-/**
- * print_elf_header_2 - prints the contents of an elf header (second half)
- * @h: elf header
- *
- * Return: void
- */
-
-void print_elf_header_2(void *h)
-{
-	Elf32_Ehdr *header = h;
-	unsigned char c, little_e = header->e_ident[EI_DATA] == ELFDATA2LSB,
-		bit_32 = header->e_ident[EI_CLASS] == ELFCLASS32;
-	uint16_t t2;
-
-	printf("  OS/ABI:                            ");
-	c = header->e_ident[EI_OSABI];
-	printf(c == ELFOSABI_NONE || c == ELFOSABI_SYSV ? "UNIX - System V"
-		: c == ELFOSABI_HPUX ? "UNIX - HP-UX"
-		: c == ELFOSABI_NETBSD ? "UNIX - NetBSD"
-		: c == ELFOSABI_LINUX || c == ELFOSABI_GNU ? "UNIX - GNU"
-		: c == ELFOSABI_SOLARIS ? "UNIX - Solaris"
-		: c == ELFOSABI_IRIX ? "UNIX - IRIX"
-		: c == ELFOSABI_FREEBSD ? "UNIX - FreeBSD"
-		: c == ELFOSABI_TRU64 ? "UNIX - TRU64"
-		: c == ELFOSABI_ARM ? "UNIX - ARM architecture"
-		: "<unknown: %x>", c), printf("\n");
-
-	printf("  ABI Version:                       ");
-	c = header->e_ident[EI_ABIVERSION];
-	printf("%d", c), printf("\n");
+	if (ptr[5] == 1)
+		type = ptr[16];
+	else
+		type = ptr[17];
 
 	printf("  Type:                              ");
-	t2 = header->e_type;
-	ensure_endianness(little_e, &t2, 2);
-	printf(t2 == ET_NONE ? "NONE (None)" :
-			t2 == ET_REL ? "REL (Relocatable file)"
-			: t2 == ET_EXEC ? "EXEC (Executable file)"
-			: t2 == ET_DYN ? "DYN (Shared object file)"
-			: t2 == ET_CORE ? "CORE (Core file)"
-			: t2 == ET_LOOS ? "OS Specific: (fe00)"
-			: t2 == ET_HIOS ? "OS Specific: (feff)"
-			: t2 == ET_LOPROC ? "Processor Specific: (ff00)"
-			: t2 == ET_HIPROC ? "Processor Specific: (ffff)"
-			: "<unknown>: %x", t2), printf("\n");
-
-	printf("  Entry point address:               ");
-	ensure_endianness(little_e, &header->e_entry, bit_32 ? 4 : 8);
-	printf("0x%lx", bit_32 ? *((uint32_t *)&header->e_entry)
-			: *((uint64_t *)&header->e_entry)), printf("\n");
+	if (type == 0)
+		printf("NONE (No file type)\n");
+	else if (type == 1)
+		printf("REL (Relocatable file)\n");
+	else if (type == 2)
+		printf("EXEC (Executable file)\n");
+	else if (type == 3)
+		printf("DYN (Shared object file)\n");
+	else if (type == 4)
+		printf("CORE (Core file)\n");
+	else
+		printf("<unknown: %x>\n", type);
 }
 
 /**
- * main - prints the elf header information of a file
- * @argc: argument count
- * @argv: arguments
- *
- * Return: 0 if the file's elf header was read successfully
+ * print_osabi - prints osabi
+ * @ptr: magic.
+ * Return: no return.
  */
+void print_osabi(char *ptr)
+{
+	char osabi = ptr[7];
 
+	printf("  OS/ABI:                            ");
+	if (osabi == 0)
+		printf("UNIX - System V\n");
+	else if (osabi == 2)
+		printf("UNIX - NetBSD\n");
+	else if (osabi == 6)
+		printf("UNIX - Solaris\n");
+	else
+		printf("<unknown: %x>\n", osabi);
+
+	printf("  ABI Version:                       %d\n", ptr[8]);
+}
+
+
+/**
+ * print_version - prints version
+ * @ptr: magic.
+ * Return: no return.
+ */
+void print_version(char *ptr)
+{
+	int version = ptr[6];
+
+	printf("  Version:                           %d", version);
+
+	if (version == EV_CURRENT)
+		printf(" (current)");
+
+	printf("\n");
+}
+/**
+ * print_data - prints data
+ * @ptr: magic.
+ * Return: no return.
+ */
+void print_data(char *ptr)
+{
+	char data = ptr[5];
+
+	printf("  Data:                              2's complement");
+	if (data == 1)
+		printf(", little endian\n");
+
+	if (data == 2)
+		printf(", big endian\n");
+}
+/**
+ * print_magic - prints magic info.
+ * @ptr: magic.
+ * Return: no return.
+ */
+void print_magic(char *ptr)
+{
+	int bytes;
+
+	printf("  Magic:  ");
+
+	for (bytes = 0; bytes < 16; bytes++)
+		printf(" %02x", ptr[bytes]);
+
+	printf("\n");
+
+}
+
+/**
+ * check_sys - check the version system.
+ * @ptr: magic.
+ * Return: no return.
+ */
+void check_sys(char *ptr)
+{
+	char sys = ptr[4] + '0';
+
+	if (sys == '0')
+		exit(98);
+
+	printf("ELF Header:\n");
+	print_magic(ptr);
+
+	if (sys == '1')
+		printf("  Class:                             ELF32\n");
+
+	if (sys == '2')
+		printf("  Class:                             ELF64\n");
+
+	print_data(ptr);
+	print_version(ptr);
+	print_osabi(ptr);
+	print_type(ptr);
+	print_addr(ptr);
+}
+
+/**
+ * check_elf - check if it is an elf file.
+ * @ptr: magic.
+ * Return: 1 if it is an elf file. 0 if not.
+ */
+int check_elf(char *ptr)
+{
+	int addr = (int)ptr[0];
+	char E = ptr[1];
+	char L = ptr[2];
+	char F = ptr[3];
+
+	if (addr == 127 && E == 'E' && L == 'L' && F == 'F')
+		return (1);
+
+	return (0);
+}
+
+/**
+ * main - check the code for Holberton School students.
+ * @argc: number of arguments.
+ * @argv: arguments vector.
+ * Return: Always 0.
+ */
 int main(int argc, char *argv[])
 {
-	char *filename, header[ELF64_HEADER_SIZE] = {0}, bit_32;
-	int handle, read_len;
-	Elf32_Ehdr *header32 = (void *)header;
+	int fd, ret_read;
+	char ptr[27];
 
 	if (argc != 2)
-		return (put_err("Usage: elf_header elf_filename\n"), 98);
-	filename = argv[1], handle = open(filename, O_RDONLY);
-	if (handle == -1)
-		return (put_err("readelf: Error: "), put_err(filename),
-				put_err(": Failed to read file's magic number\n"), 98);
-	read_len = read(handle, header, ELF64_HEADER_SIZE);
-	if (read_len == -1)
-		return (put_err("readelf: Error: "), put_err(filename),
-				put_err(": Failed to read file's magic number\n"), 98);
-	bit_32 = header32->e_ident[EI_CLASS] == ELFCLASS32;
-	if (read_len < (int)ELF32_HEADER_SIZE ||
-			(!bit_32 && read_len != ELF64_HEADER_SIZE) ||
-			!((header32->e_ident[EI_MAG0] == ELFMAG0) &&
-				(header32->e_ident[EI_MAG1] == ELFMAG1) &&
-				(header32->e_ident[EI_MAG2] == ELFMAG2) &&
-				(header32->e_ident[EI_MAG3] == ELFMAG3)))
-		return (put_err("readelf: Error: Not an ELF file - "),
-				put_err("it has the wrong magic bytes at the start\n"), 98);
+	{
+		dprintf(STDERR_FILENO, "Usage: elf_header elf_filename\n");
+		exit(98);
+	}
 
-	print_elf_header(header32);
-	close(handle);
+	fd = open(argv[1], O_RDONLY);
+
+	if (fd < 0)
+	{
+		dprintf(STDERR_FILENO, "Err: file can not be open\n");
+		exit(98);
+	}
+
+	lseek(fd, 0, SEEK_SET);
+	ret_read = read(fd, ptr, 27);
+
+	if (ret_read == -1)
+	{
+		dprintf(STDERR_FILENO, "Err: The file can not be read\n");
+		exit(98);
+	}
+
+	if (!check_elf(ptr))
+	{
+		dprintf(STDERR_FILENO, "Err: It is not an ELF\n");
+		exit(98);
+	}
+
+	check_sys(ptr);
+	close(fd);
+
 	return (0);
 }
